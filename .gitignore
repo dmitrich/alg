@@ -1,0 +1,23 @@
+# Data files
+data/
+
+# Model weights
+model.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Kiro
+.kiro/
