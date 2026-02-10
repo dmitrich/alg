@@ -38,7 +38,6 @@ These rules define the default coding behavior for this repository when using Ki
 - Always use uv virtual environment
 - Environment name matches project folder name (e.g., `alg1` folder → `alg1` environment)
 - Environment location: `.venv` in project root
-- Activate before running any Python commands: `source .venv/bin/activate` (or `uv run` prefix)
 - Install packages with: `uv pip install <package>`
 
 ## Default Guidance
@@ -51,7 +50,7 @@ When in doubt:
 ## Python Naming Conventions
 
 **File Names:**
-- Project files: lowercase with hyphens (e.g., `config-loader.py`)
+- Project files: lowercase with hyphens (e.g., `config_loader.py`)
 - Test/temporary files: lowercase with underscores (e.g., `test_model.py`, `_temp_data.py`)
 - Existing pattern: snake_case for modules (e.g., `model.py`, `train.py`, `data.py`, `utils.py`)
 
