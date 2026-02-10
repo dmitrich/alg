@@ -19,4 +19,5 @@ dependencies = [
     "gradio>=6.5.1",
     "safetensors>=0.4.0",  # Required for secure model weight serialization
     "hypothesis>=6.0.0",  # Required for property-based testing
+    "tensorboard>=2.11.0",  # Required for training visualization
 ]
