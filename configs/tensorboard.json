@@ -1,5 +1,6 @@
 {
   "runs_directory": "runs",
   "default_port": 6006,
-  "max_port_attempts": 10
+  "max_port_attempts": 10,
+  "histogram_interval": 100
 }

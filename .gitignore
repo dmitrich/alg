@@ -1,3 +1,7 @@
+#tests
+tests/
+runs/
+
 # Data files
 data/
 

@@ -70,3 +70,52 @@ class MetricLogger:
             except Exception as e:
                 print(f"Warning: Failed to log gradient norm: {e}")
                 self.writer.available = False
+    
+    def log_model_histograms(self, model, step: int) -> None:
+        """
+        Log histograms of model parameters and gradients.
+        
+        Args:
+            model: PyTorch model instance
+            step: Current iteration/step number
+        """
+        if self.writer.is_available():
+            try:
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        # Log parameter values
+                        self.writer.writer.add_histogram(
+                            f'Parameters/{name}', 
+                            param.data.cpu(), 
+                            step
+                        )
+                        # Log gradients if they exist
+                        if param.grad is not None:
+                            self.writer.writer.add_histogram(
+                                f'Gradients/{name}', 
+                                param.grad.data.cpu(), 
+                                step
+                            )
+            except Exception as e:
+                print(f"Warning: Failed to log model histograms: {e}")
+                self.writer.available = False
+    
+    def log_activation_histograms(self, activations: dict, step: int) -> None:
+        """
+        Log histograms of layer activations.
+        
+        Args:
+            activations: Dictionary mapping layer names to activation tensors
+            step: Current iteration/step number
+        """
+        if self.writer.is_available():
+            try:
+                for name, activation in activations.items():
+                    self.writer.writer.add_histogram(
+                        f'Activations/{name}', 
+                        activation.data.cpu(), 
+                        step
+                    )
+            except Exception as e:
+                print(f"Warning: Failed to log activation histograms: {e}")
+                self.writer.available = False

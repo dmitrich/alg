@@ -23,13 +23,15 @@ def load_tensorboard_config(config_path: str = "configs/tensorboard.json") -> di
         {
             "runs_directory": "runs",
             "default_port": 6006,
-            "max_port_attempts": 10
+            "max_port_attempts": 10,
+            "histogram_interval": 100
         }
     """
     default_config = {
         "runs_directory": "runs",
         "default_port": 6006,
-        "max_port_attempts": 10
+        "max_port_attempts": 10,
+        "histogram_interval": 100
     }
     
     try:
@@ -78,3 +80,14 @@ def get_max_port_attempts() -> int:
     """
     config = load_tensorboard_config()
     return config.get("max_port_attempts", 10)
+
+
+def get_histogram_interval() -> int:
+    """
+    Get the configured histogram logging interval.
+    
+    Returns:
+        The number of steps between histogram logging (default: 100)
+    """
+    config = load_tensorboard_config()
+    return config.get("histogram_interval", 100)

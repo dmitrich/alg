@@ -38,9 +38,9 @@ import model
 from model import BigramLanguageModel
 
 # Added for new folder structure - configuration and run management
-from alg1_utils.utils_config_loader import ConfigLoader
-from alg1_utils.utils_run_manager import RunIDGenerator, RunDirectoryCreator, MetadataCapture
-from alg1_utils.utils_output import print_run_summary, print_completion_summary
+from utils_alg1.utils_config_loader import ConfigLoader
+from utils_alg1.utils_run_manager import RunIDGenerator, RunDirectoryCreator, MetadataCapture
+from utils_alg1.utils_output import print_run_summary, print_completion_summary
 from datetime import datetime
 import os
 
@@ -48,6 +48,7 @@ import os
 from utils_tensorboard.writer import TensorBoardWriter
 from utils_tensorboard.logger import MetricLogger
 from utils_tensorboard.instructions import print_tensorboard_instructions
+from utils_tensorboard.config import get_histogram_interval
 
 
 # Added for CLI support - parse command-line arguments for hyperparameter overrides
@@ -178,9 +179,11 @@ output_paths = get_output_paths(run_dir)
 
 # Initialize TensorBoard writer for training visualization
 tensorboard_dir = os.path.join(run_dir, 'logs', 'tensorboard')
-secondary_tensorboard_dir = run_dir  # Also save directly in run directory
-tb_writer = TensorBoardWriter(tensorboard_dir, secondary_tensorboard_dir)
+tb_writer = TensorBoardWriter(tensorboard_dir)
 tb_logger = MetricLogger(tb_writer)
+
+# Get histogram logging interval from config
+histogram_interval = get_histogram_interval()
 
 # Print run summary at start
 print_run_summary(run_id, config, start_time)
@@ -289,6 +292,11 @@ for iter in range(max_iters):
             learning_rate,
             iter
         )
+    
+    # Periodically log model parameter and gradient histograms
+    # Only log if histogram_interval is positive
+    if histogram_interval > 0 and (iter % histogram_interval == 0 or iter == max_iters - 1):
+        tb_logger.log_model_histograms(model_instance, iter)
 
     # Sample a batch of training data
     # xb: input sequences (batch_size, block_size)
