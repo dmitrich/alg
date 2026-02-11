@@ -50,6 +50,10 @@ from utils_tensorboard.logger import MetricLogger
 from utils_tensorboard.instructions import print_tensorboard_instructions
 from utils_tensorboard.config import get_histogram_interval
 
+# Added for Aim experiment tracking - comprehensive experiment tracking and visualization
+from utils_aim.tracker import AimTracker
+from utils_aim.instructions import print_aim_instructions
+
 
 # Added for CLI support - parse command-line arguments for hyperparameter overrides
 parser = argparse.ArgumentParser(description='Train GPT model on text data')
@@ -177,6 +181,18 @@ start_time = datetime.now().isoformat()
 run_dir, config, run_id = setup_training_run(args)
 output_paths = get_output_paths(run_dir)
 
+# Initialize Aim tracker for experiment tracking
+aim_tracker = AimTracker(run_id, run_dir)
+
+# Track hyperparameters and configuration in Aim
+aim_tracker.track_config(config)
+
+# Track git and environment metadata for reproducibility
+metadata_capture = MetadataCapture()
+aim_tracker.track_metadata('git_commit', metadata_capture.get_git_commit())
+aim_tracker.track_metadata('git_branch', metadata_capture.get_git_branch())
+aim_tracker.track_metadata('python_version', metadata_capture.get_python_version())
+
 # Initialize TensorBoard writer for training visualization
 tensorboard_dir = os.path.join(run_dir, 'logs', 'tensorboard')
 tb_writer = TensorBoardWriter(tensorboard_dir)
@@ -276,48 +292,69 @@ def estimate_loss() -> dict:
 # The optimizer will update model parameters to minimize the loss
 optimizer = torch.optim.AdamW(model_instance.parameters(), lr=learning_rate)
 
-# Main training loop - iterate for the specified number of training steps
-for iter in range(max_iters):
+# Wrap training in try-finally to ensure Aim cleanup happens even on failure
+try:
+    # Main training loop - iterate for the specified number of training steps
+    for iter in range(max_iters):
 
-    # Periodically evaluate loss on train and val sets to monitor training progress
-    # This helps us see if the model is learning and if it's overfitting
-    if iter % eval_interval == 0 or iter == max_iters - 1:
-        losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        # Periodically evaluate loss on train and val sets to monitor training progress
+        # This helps us see if the model is learning and if it's overfitting
+        if iter % eval_interval == 0 or iter == max_iters - 1:
+            losses = estimate_loss()
+            print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            
+            # Track evaluation metrics in Aim with context for train/val subsets
+            aim_tracker.track_metric('loss', losses['train'].item(), iter, context={'subset': 'train'})
+            aim_tracker.track_metric('loss', losses['val'].item(), iter, context={'subset': 'val'})
+            
+            # Log evaluation metrics to TensorBoard
+            tb_logger.log_evaluation_metrics(
+                losses['train'].item(),
+                losses['val'].item(),
+                learning_rate,
+                iter
+            )
         
-        # Log evaluation metrics to TensorBoard
-        tb_logger.log_evaluation_metrics(
-            losses['train'].item(),
-            losses['val'].item(),
-            learning_rate,
-            iter
-        )
-    
-    # Periodically log model parameter and gradient histograms
-    # Only log if histogram_interval is positive
-    if histogram_interval > 0 and (iter % histogram_interval == 0 or iter == max_iters - 1):
-        tb_logger.log_model_histograms(model_instance, iter)
+        # Periodically log model parameter and gradient histograms
+        # Only log if histogram_interval is positive
+        if histogram_interval > 0 and (iter % histogram_interval == 0 or iter == max_iters - 1):
+            tb_logger.log_model_histograms(model_instance, iter)
+            
+            # Track parameter and gradient distributions in Aim
+            for name, param in model_instance.named_parameters():
+                aim_tracker.track_distribution(name, param.detach().cpu().numpy(), iter, context={'type': 'param'})
+                
+                # Track gradient distributions if gradients exist
+                if param.grad is not None:
+                    aim_tracker.track_distribution(name + '.grad', param.grad.detach().cpu().numpy(), iter, context={'type': 'grad'})
 
-    # Sample a batch of training data
-    # xb: input sequences (batch_size, block_size)
-    # yb: target sequences (batch_size, block_size) - shifted by 1 position
-    xb, yb = get_batch('train', train_data, val_data, block_size, batch_size, device)
+        # Sample a batch of training data
+        # xb: input sequences (batch_size, block_size)
+        # yb: target sequences (batch_size, block_size) - shifted by 1 position
+        xb, yb = get_batch('train', train_data, val_data, block_size, batch_size, device)
 
-    # Forward pass: compute model predictions and loss
-    # logits: raw prediction scores for each token in vocabulary
-    # loss: cross-entropy loss measuring prediction error
-    logits, loss = model_instance(xb, yb)
-    
-    # Backward pass: compute gradients
-    # First, zero out gradients from previous iteration
-    optimizer.zero_grad(set_to_none=True)
-    # Compute gradients of loss with respect to all model parameters
-    loss.backward()
-    # Update model parameters using computed gradients
-    optimizer.step()
-    
-    # Log training loss to TensorBoard
-    tb_logger.log_training_loss(loss.item(), iter)
+        # Forward pass: compute model predictions and loss
+        # logits: raw prediction scores for each token in vocabulary
+        # loss: cross-entropy loss measuring prediction error
+        logits, loss = model_instance(xb, yb)
+        
+        # Backward pass: compute gradients
+        # First, zero out gradients from previous iteration
+        optimizer.zero_grad(set_to_none=True)
+        # Compute gradients of loss with respect to all model parameters
+        loss.backward()
+        # Update model parameters using computed gradients
+        optimizer.step()
+        
+        # Track training loss in Aim for experiment tracking
+        aim_tracker.track_metric('loss', loss.item(), iter, context={'subset': 'train'})
+        
+        # Log training loss to TensorBoard
+        tb_logger.log_training_loss(loss.item(), iter)
+
+finally:
+    # Ensure Aim tracker is closed even if training fails
+    aim_tracker.close()
 
 # Close TensorBoard writer and flush all data to disk
 tb_writer.close()
@@ -341,6 +378,9 @@ import json
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 print(f"Configuration saved to '{config_path}'")
+
+# Print Aim UI launch instructions
+print_aim_instructions()
 
 # Print completion summary
 print_completion_summary(run_id, config, start_time, end_time)

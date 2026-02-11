@@ -105,6 +105,61 @@ class RunDirectoryCreator:
 class MetadataCapture:
     """Captures git and environment metadata."""
     
+    def get_git_commit(self) -> str:
+        """
+        Get git commit hash.
+        
+        Returns:
+            Commit hash string, or 'unavailable' if git info cannot be retrieved
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode != 0:
+                return 'unavailable'
+            
+            return result.stdout.strip()
+        
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+            return 'unavailable'
+    
+    def get_git_branch(self) -> str:
+        """
+        Get git branch name.
+        
+        Returns:
+            Branch name string, or 'unavailable' if git info cannot be retrieved
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode != 0:
+                return 'unavailable'
+            
+            return result.stdout.strip()
+        
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+            return 'unavailable'
+    
+    def get_python_version(self) -> str:
+        """
+        Get Python version.
+        
+        Returns:
+            Python version string
+        """
+        return sys.version.split()[0]  # Get just the version number (e.g., "3.11.5")
+    
     def capture_git_info(self, output_path: str) -> None:
         """
         Capture git commit hash and dirty flag.
