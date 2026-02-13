@@ -72,8 +72,8 @@ class ModelConfig:
     dropout: float
     vocab_size: int
     
-    # Device configuration with default based on CUDA availability
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # Device configuration with default based on MPS/CUDA/CPU availability
+    device: str = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     
     def validate(self) -> None:
         """

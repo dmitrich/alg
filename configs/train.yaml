@@ -1,6 +1,8 @@
+aim_logging: false
 batch_size: 4
 block_size: 64
 eval_interval: 100
 eval_iters: 200
-learning_rate: 0.002
-max_iters: 1000
+learning_rate: 0.02
+max_iters: 2000
+torch_compile: true

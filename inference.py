@@ -219,9 +219,9 @@ print(f"Loading model from: {model_id}")
 # ============================================================================
 # STEP 3: Device Selection
 # ============================================================================
-# Added for device selection - automatically use GPU if available, fallback to CPU
-# This ensures the script works on both GPU and CPU-only systems
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# Added for device selection - automatically use MPS (M4), CUDA, or CPU
+# This ensures the script works on Apple Silicon, NVIDIA GPUs, and CPU-only systems
+device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
 # ============================================================================
@@ -267,9 +267,9 @@ print(f"Vocabulary size: {vocab_size}")
 # ============================================================================
 # Added for parameter management - create ModelConfig instance from config dict
 # This provides type-safe parameter management and validation
-# Filter out data-specific parameters that ModelConfig doesn't need
+# Filter out data-specific parameters and optimization flags that ModelConfig doesn't need
 model_config_params = {k: v for k, v in config.items() 
-                       if k not in ['data_path', 'train_split', 'val_split']}
+                       if k not in ['data_path', 'train_split', 'val_split', 'aim_logging', 'torch_compile']}
 config_obj = ModelConfig.from_dict(model_config_params, vocab_size)
 config_obj.validate()  # Validate all parameters
 config_obj.apply_to_model_module(model)  # Set global variables in model module
@@ -296,6 +296,19 @@ print(f"Model weights loaded successfully from {model_path}!")
 # Added for inference mode - set model to evaluation mode
 # This disables dropout and other training-specific behaviors
 m.eval()
+
+# Apply torch.compile for PyTorch 2.x optimization (fuses operations, reduces overhead)
+# This provides significant speedup for inference on Mac M4 with MPS backend
+use_compile = config.get('torch_compile', True)
+if use_compile and hasattr(torch, 'compile'):
+    print("Compiling model with torch.compile for optimized inference...")
+    m = torch.compile(m, backend='aot_eager')  # Use aot_eager backend for MPS compatibility
+    print("✓ Model compiled successfully")
+else:
+    if not use_compile:
+        print("torch.compile disabled (torch_compile=false in config)")
+    else:
+        print("torch.compile not available (requires PyTorch 2.0+)")
 
 # ============================================================================
 # STEP 8: Run Inference (Interactive or Single)

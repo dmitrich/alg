@@ -181,17 +181,22 @@ start_time = datetime.now().isoformat()
 run_dir, config, run_id = setup_training_run(args)
 output_paths = get_output_paths(run_dir)
 
-# Initialize Aim tracker for experiment tracking
-aim_tracker = AimTracker(run_id, run_dir)
-
-# Track hyperparameters and configuration in Aim
-aim_tracker.track_config(config)
-
-# Track git and environment metadata for reproducibility
-metadata_capture = MetadataCapture()
-aim_tracker.track_metadata('git_commit', metadata_capture.get_git_commit())
-aim_tracker.track_metadata('git_branch', metadata_capture.get_git_branch())
-aim_tracker.track_metadata('python_version', metadata_capture.get_python_version())
+# Initialize Aim tracker for experiment tracking (if enabled)
+aim_enabled = config.get('aim_logging', False)
+if aim_enabled:
+    aim_tracker = AimTracker(run_id, run_dir)
+    
+    # Track hyperparameters and configuration in Aim
+    aim_tracker.track_config(config)
+    
+    # Track git and environment metadata for reproducibility
+    metadata_capture = MetadataCapture()
+    aim_tracker.track_metadata('git_commit', metadata_capture.get_git_commit())
+    aim_tracker.track_metadata('git_branch', metadata_capture.get_git_branch())
+    aim_tracker.track_metadata('python_version', metadata_capture.get_python_version())
+else:
+    aim_tracker = None
+    print("Aim logging disabled (aim_logging=false in config)")
 
 # Initialize TensorBoard writer for training visualization
 tensorboard_dir = os.path.join(run_dir, 'logs', 'tensorboard')
@@ -222,9 +227,9 @@ print(f"Vocabulary size: {vocab_size}")
 
 # Added for configuration - create ModelConfig instance from loaded config
 # This provides type-safe parameter management and validation
-# Filter out data-specific parameters that ModelConfig doesn't need
+# Filter out data-specific parameters and logging flags that ModelConfig doesn't need
 model_config_params = {k: v for k, v in config.items() 
-                       if k not in ['data_path', 'train_split', 'val_split']}
+                       if k not in ['data_path', 'train_split', 'val_split', 'aim_logging', 'torch_compile']}
 config_obj = ModelConfig.from_dict(model_config_params, vocab_size)
 # Validate all parameters to catch configuration errors early
 config_obj.validate()
@@ -256,6 +261,19 @@ model_instance = BigramLanguageModel()
 m = model_instance.to(device)
 # Print the number of trainable parameters in the model
 print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+
+# Apply torch.compile for PyTorch 2.x optimization (fuses operations, reduces overhead)
+# This provides significant speedup on Mac M4 with MPS backend
+use_compile = config.get('torch_compile', True)
+if use_compile and hasattr(torch, 'compile'):
+    print("Compiling model with torch.compile for optimized performance...")
+    m = torch.compile(m, backend='aot_eager')  # Use aot_eager backend for MPS compatibility
+    print("✓ Model compiled successfully")
+else:
+    if not use_compile:
+        print("torch.compile disabled (torch_compile=false in config)")
+    else:
+        print("torch.compile not available (requires PyTorch 2.0+)")
 
 @torch.no_grad()
 def estimate_loss() -> dict:
@@ -303,9 +321,10 @@ try:
             losses = estimate_loss()
             print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
             
-            # Track evaluation metrics in Aim with context for train/val subsets
-            aim_tracker.track_metric('loss', losses['train'].item(), iter, context={'subset': 'train'})
-            aim_tracker.track_metric('loss', losses['val'].item(), iter, context={'subset': 'val'})
+            # Track evaluation metrics in Aim with context for train/val subsets (if enabled)
+            if aim_tracker is not None:
+                aim_tracker.track_metric('loss', losses['train'].item(), iter, context={'subset': 'train'})
+                aim_tracker.track_metric('loss', losses['val'].item(), iter, context={'subset': 'val'})
             
             # Log evaluation metrics to TensorBoard
             tb_logger.log_evaluation_metrics(
@@ -320,13 +339,14 @@ try:
         if histogram_interval > 0 and (iter % histogram_interval == 0 or iter == max_iters - 1):
             tb_logger.log_model_histograms(model_instance, iter)
             
-            # Track parameter and gradient distributions in Aim
-            for name, param in model_instance.named_parameters():
-                aim_tracker.track_distribution(name, param.detach().cpu().numpy(), iter, context={'type': 'param'})
-                
-                # Track gradient distributions if gradients exist
-                if param.grad is not None:
-                    aim_tracker.track_distribution(name + '.grad', param.grad.detach().cpu().numpy(), iter, context={'type': 'grad'})
+            # Track parameter and gradient distributions in Aim (if enabled)
+            if aim_tracker is not None:
+                for name, param in model_instance.named_parameters():
+                    aim_tracker.track_distribution(name, param.detach().cpu().numpy(), iter, context={'type': 'param'})
+                    
+                    # Track gradient distributions if gradients exist
+                    if param.grad is not None:
+                        aim_tracker.track_distribution(name + '.grad', param.grad.detach().cpu().numpy(), iter, context={'type': 'grad'})
 
         # Sample a batch of training data
         # xb: input sequences (batch_size, block_size)
@@ -346,15 +366,17 @@ try:
         # Update model parameters using computed gradients
         optimizer.step()
         
-        # Track training loss in Aim for experiment tracking
-        aim_tracker.track_metric('loss', loss.item(), iter, context={'subset': 'train'})
+        # Track training loss in Aim for experiment tracking (if enabled)
+        if aim_tracker is not None:
+            aim_tracker.track_metric('loss', loss.item(), iter, context={'subset': 'train'})
         
         # Log training loss to TensorBoard
         tb_logger.log_training_loss(loss.item(), iter)
 
 finally:
-    # Ensure Aim tracker is closed even if training fails
-    aim_tracker.close()
+    # Ensure Aim tracker is closed even if training fails (if enabled)
+    if aim_tracker is not None:
+        aim_tracker.close()
 
 # Close TensorBoard writer and flush all data to disk
 tb_writer.close()
@@ -379,8 +401,9 @@ with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 print(f"Configuration saved to '{config_path}'")
 
-# Print Aim UI launch instructions
-print_aim_instructions()
+# Print Aim UI launch instructions (if enabled)
+if aim_enabled:
+    print_aim_instructions()
 
 # Print completion summary
 print_completion_summary(run_id, config, start_time, end_time)
