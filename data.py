@@ -8,7 +8,7 @@ sampling for the GPT model training pipeline.
 
 import torch
 from typing import Tuple
-from utils import create_tokenizer
+from tokenizer import create_tokenizer
 
 
 def load_data(data_path: str = 'data/input.txt') -> Tuple[torch.Tensor, torch.Tensor, str]:

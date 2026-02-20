@@ -31,15 +31,15 @@ from config import load_config, validate_config
 from parameters import ModelConfig
 
 # Added for modular imports - tokenization utilities
-from utils import create_tokenizer
+from tokenizer import create_tokenizer
 
 # Added for modular imports - model architecture
 import model
-from model import BigramLanguageModel
+from model import LanguageModel
 
 # Added for new folder structure - configuration and output management
-from utils_alg1.utils_config_loader import ConfigLoader
-from utils_alg1.utils_output import print_inference_summary, print_inference_completion
+from utils.alg.utils_config_loader import ConfigLoader
+from utils.alg.utils_output import print_inference_summary, print_inference_completion
 from datetime import datetime
 import os
 import json
@@ -198,7 +198,8 @@ def run_interactive_inference(m, encode, decode, config_obj, args):
         context = torch.tensor([context_tokens], dtype=torch.long, device=config_obj.device)
         
         with torch.no_grad():
-            generated_tokens = m.generate(context, max_new_tokens=args.max_tokens)[0].tolist()
+            # DECODE PHASE: Generate tokens autoregressively one at a time
+            generated_tokens = m.decode(context, max_new_tokens=args.max_tokens)[0].tolist()
         
         generated_text = decode(generated_tokens)
         print(generated_text)
@@ -277,9 +278,9 @@ config_obj.apply_to_model_module(model)  # Set global variables in model module
 # ============================================================================
 # STEP 6: Initialize Model Architecture
 # ============================================================================
-# Added for model initialization - instantiate the BigramLanguageModel
+# Added for model initialization - instantiate the LanguageModel
 # This creates the model with the architecture defined by the hyperparameters
-m = BigramLanguageModel()
+m = LanguageModel()
 m = m.to(config_obj.device)  # Move model to GPU or CPU
 print(f"Model parameters: {sum(p.numel() for p in m.parameters())/1e6:.2f}M")
 
@@ -329,7 +330,8 @@ else:
     print("-" * 80)
     
     with torch.no_grad():
-        generated_tokens = m.generate(context, max_new_tokens=args.max_tokens)[0].tolist()
+        # DECODE PHASE: Generate tokens autoregressively one at a time
+        generated_tokens = m.decode(context, max_new_tokens=args.max_tokens)[0].tolist()
     
     generated_text = decode(generated_tokens)
     print(generated_text)

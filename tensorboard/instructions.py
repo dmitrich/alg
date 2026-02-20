@@ -5,7 +5,7 @@ This module provides functionality to print instructions for manually
 launching TensorBoard with the correct configuration.
 """
 
-from utils_tensorboard.config import get_runs_directory, get_default_port
+from tensorboard.config import get_runs_directory, get_default_port
 
 
 def print_tensorboard_instructions(log_dir: str) -> None:
@@ -23,8 +23,6 @@ def print_tensorboard_instructions(log_dir: str) -> None:
     print("="*70)
     print(f"\nYour training logs have been saved to:")
     print(f"  {log_dir}")
-    print(f"\nTo view your training metrics in TensorBoard, run:")
-    print(f"\n  tensorboard --logdir={log_dir} --port={default_port}")
     print(f"\nOr to view all runs in the '{runs_dir}' directory:")
     print(f"\n  tensorboard --logdir={runs_dir} --port={default_port}")
     print(f"\nThen open your browser to: http://localhost:{default_port}/")

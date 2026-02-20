@@ -4,7 +4,7 @@ These rules define the default coding behavior for this repository when using Ki
 
 ## Core Principles
 
-- Optimize for speed and clarity over extensibility
+- Optimize for speed and simplicity over extensibility
 - Assume code is disposable and short-lived
 - Prefer fewer lines over abstraction
 - Readability beats architecture
@@ -36,7 +36,7 @@ These rules define the default coding behavior for this repository when using Ki
 ## Python Environment
 
 - Always use uv virtual environment
-- Environment name matches project folder name (e.g., `alg1` folder → `alg1` environment)
+- Environment name matches project folder name (e.g., `alg` folder → `alg` environment)
 - Environment location: `.venv` in project root
 - Install packages with: `uv pip install <package>`
 
@@ -52,11 +52,11 @@ When in doubt:
 **File Names:**
 - Project files: lowercase with hyphens (e.g., `config_loader.py`)
 - Test/temporary files: lowercase with underscores (e.g., `test_model.py`, `_temp_data.py`)
-- Existing pattern: snake_case for modules (e.g., `model.py`, `train.py`, `data.py`, `utils.py`)
+- Existing pattern: snake_case for modules (e.g., `model.py`, `train.py`, `data.py`, `tokenizer.py`)
 
 **Code:**
 - Variables/functions: snake_case (e.g., `batch_size`, `load_config`, `get_batch`)
-- Classes: PascalCase (e.g., `BigramLanguageModel`, `ModelConfig`, `Head`)
+- Classes: PascalCase (e.g., `LanguageModel`, `ModelConfig`, `Head`)
 - Constants: UPPER_SNAKE_CASE (e.g., `MAX_ITERS`, `DEVICE`)
 - Private: prefix with underscore (e.g., `_internal_method`)
 

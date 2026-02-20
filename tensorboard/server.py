@@ -11,7 +11,7 @@ import sys
 import os
 import urllib.request
 import urllib.error
-from utils_tensorboard.config import get_runs_directory, get_default_port, get_max_port_attempts
+from tensorboard.config import get_runs_directory, get_default_port, get_max_port_attempts
 
 
 def is_port_in_use(port: int) -> bool:

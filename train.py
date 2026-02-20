@@ -31,28 +31,28 @@ from parameters import ModelConfig
 from data import load_data, get_batch
 
 # Added for modular imports - tokenization utilities
-from utils import create_tokenizer
+from tokenizer import create_tokenizer
 
 # Added for modular imports - model architecture
 import model
-from model import BigramLanguageModel
+from model import LanguageModel
 
 # Added for new folder structure - configuration and run management
-from utils_alg1.utils_config_loader import ConfigLoader
-from utils_alg1.utils_run_manager import RunIDGenerator, RunDirectoryCreator, MetadataCapture
-from utils_alg1.utils_output import print_run_summary, print_completion_summary
+from utils.alg.utils_config_loader import ConfigLoader
+from utils.alg.utils_run_manager import RunIDGenerator, RunDirectoryCreator, MetadataCapture
+from utils.alg.utils_output import print_run_summary, print_completion_summary
 from datetime import datetime
 import os
 
 # Added for TensorBoard integration - logging and visualization
-from utils_tensorboard.writer import TensorBoardWriter
-from utils_tensorboard.logger import MetricLogger
-from utils_tensorboard.instructions import print_tensorboard_instructions
-from utils_tensorboard.config import get_histogram_interval
+from tensorboard.writer import TensorBoardWriter
+from tensorboard.logger import MetricLogger
+from tensorboard.instructions import print_tensorboard_instructions
+from tensorboard.config import get_histogram_interval
 
 # Added for Aim experiment tracking - comprehensive experiment tracking and visualization
-from utils_aim.tracker import AimTracker
-from utils_aim.instructions import print_aim_instructions
+from utils.aim.tracker import AimTracker
+from utils.aim.instructions import print_aim_instructions
 
 
 # Added for CLI support - parse command-line arguments for hyperparameter overrides
@@ -255,8 +255,8 @@ device = config_obj.device
 print(f"Using device: {device}")
 
 # Added for model initialization - create model instance
-# BigramLanguageModel is the GPT model with multi-head attention and transformer blocks
-model_instance = BigramLanguageModel()
+# LanguageModel is the GPT model with multi-head attention and transformer blocks
+model_instance = LanguageModel()
 # Move model to GPU/CPU device
 m = model_instance.to(device)
 # Print the number of trainable parameters in the model
@@ -295,8 +295,8 @@ def estimate_loss() -> dict:
         for k in range(eval_iters):
             # Get a batch of data from the specified split
             X, Y = get_batch(split, train_data, val_data, block_size, batch_size, device)
-            # Forward pass: compute predictions and loss
-            logits, loss = model_instance(X, Y)
+            # PREFILL PHASE: Process all tokens in parallel for evaluation
+            logits, loss = model_instance.prefill(X, Y)
             # Store the loss value (convert from tensor to Python float)
             losses[k] = loss.item()
         # Average the losses across all evaluation batches
@@ -353,10 +353,10 @@ try:
         # yb: target sequences (batch_size, block_size) - shifted by 1 position
         xb, yb = get_batch('train', train_data, val_data, block_size, batch_size, device)
 
-        # Forward pass: compute model predictions and loss
+        # PREFILL PHASE: Process all tokens in parallel for training
         # logits: raw prediction scores for each token in vocabulary
         # loss: cross-entropy loss measuring prediction error
-        logits, loss = model_instance(xb, yb)
+        logits, loss = model_instance.prefill(xb, yb)
         
         # Backward pass: compute gradients
         # First, zero out gradients from previous iteration

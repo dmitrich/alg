@@ -6,7 +6,7 @@ for logging different types of training metrics to TensorBoard with graceful
 error handling.
 """
 
-from utils_tensorboard.writer import TensorBoardWriter
+from tensorboard.writer import TensorBoardWriter
 
 
 class MetricLogger:

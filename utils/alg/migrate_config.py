@@ -10,7 +10,7 @@ Usage:
 """
 
 import argparse
-from utils_alg1.utils_config_loader import ConfigMigrator
+from utils.alg.utils_config_loader import ConfigMigrator
 
 
 def main():

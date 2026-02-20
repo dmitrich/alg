@@ -23,12 +23,12 @@ Model Persistence:
 
 Example:
     >>> # Training
-    >>> model = BigramLanguageModel()
+    >>> model = LanguageModel()
     >>> # ... train the model ...
     >>> model.save_safetensors('model.safetensors')
     
     >>> # Inference
-    >>> model = BigramLanguageModel()
+    >>> model = LanguageModel()
     >>> model.load_safetensors('model.safetensors')
     >>> model.eval()
     >>> # ... generate text ...
@@ -128,8 +128,8 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-# super simple bigram model
-class BigramLanguageModel(nn.Module):
+# Transformer language model
+class LanguageModel(nn.Module):
     """
     Character-level transformer language model with multi-head self-attention.
     
@@ -166,14 +166,14 @@ class BigramLanguageModel(nn.Module):
     
     Example:
         >>> # Initialize model
-        >>> model = BigramLanguageModel()
+        >>> model = LanguageModel()
         >>> model.to(device)
         
-        >>> # Training
+        >>> # Training (PREFILL PHASE)
         >>> optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
         >>> for batch in data_loader:
         ...     xb, yb = batch
-        ...     logits, loss = model(xb, yb)
+        ...     logits, loss = model.prefill(xb, yb)  # Process all tokens in parallel
         ...     optimizer.zero_grad()
         ...     loss.backward()
         ...     optimizer.step()
@@ -182,13 +182,13 @@ class BigramLanguageModel(nn.Module):
         >>> model.save_safetensors('model.safetensors')
         
         >>> # Load for inference
-        >>> model = BigramLanguageModel()
+        >>> model = LanguageModel()
         >>> model.load_safetensors('model.safetensors')
         >>> model.eval()
         
-        >>> # Generate text
+        >>> # Generate text (DECODE PHASE)
         >>> context = torch.zeros((1, 1), dtype=torch.long, device=device)
-        >>> generated = model.generate(context, max_new_tokens=100)
+        >>> generated = model.decode(context, max_new_tokens=100)  # Generate one token at a time
     
     Attributes:
         token_embedding_table (nn.Embedding): Character token embeddings
@@ -198,16 +198,18 @@ class BigramLanguageModel(nn.Module):
         lm_head (nn.Linear): Language modeling head for logit prediction
     
     Methods:
-        forward(idx, targets=None): Compute logits and optionally loss
-        generate(idx, max_new_tokens): Generate new tokens autoregressively
+        prefill(idx, targets=None): PREFILL PHASE - Process sequences in parallel for training/evaluation
+        decode(idx, max_new_tokens): DECODE PHASE - Generate tokens autoregressively for inference
+        forward(idx, targets=None): Backward compatibility wrapper for prefill()
+        generate(idx, max_new_tokens): Backward compatibility wrapper for decode()
         save_safetensors(path): Save model weights in SafeTensors format
         load_safetensors(path): Load model weights from SafeTensors format
         save_weights(weights_dir): [DEPRECATED] Save weights as text files
         load_weights(weights_dir): [DEPRECATED] Load weights from text files
     
     Note:
-        The model name "BigramLanguageModel" is historical and does not reflect the
-        actual architecture, which is a full transformer model, not a simple bigram model.
+        This is a full transformer model with multi-head self-attention and feed-forward layers,
+        implementing a decoder-only architecture for autoregressive language modeling.
     """
 
     def __init__(self):
@@ -219,13 +221,16 @@ class BigramLanguageModel(nn.Module):
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
-    def forward(self, idx: torch.Tensor, targets: torch.Tensor = None) -> tuple:
+    def prefill(self, idx: torch.Tensor, targets: torch.Tensor = None) -> tuple:
         """
-        Forward pass through the model.
+        PREFILL PHASE: Process entire sequences in parallel for training/evaluation.
         
-        Computes logits for next-token prediction and optionally calculates cross-entropy
-        loss when targets are provided. This method is called during both training and
-        inference.
+        This method processes all tokens in the input sequence simultaneously, computing
+        predictions for every position in parallel. This is the primary method used during
+        training and evaluation where we have access to the complete target sequence.
+        
+        The prefill phase leverages GPU parallelism by processing all T tokens at once,
+        making it much more efficient than sequential token generation (decode phase).
         
         Args:
             idx (torch.Tensor): Input token indices of shape (B, T) where:
@@ -246,23 +251,30 @@ class BigramLanguageModel(nn.Module):
                   otherwise None. Loss is averaged over all tokens in the batch.
         
         Example:
-            >>> # Training mode with loss computation
-            >>> model = BigramLanguageModel()
+            >>> # Training mode with loss computation (PREFILL)
+            >>> model = LanguageModel()
             >>> xb = torch.randint(0, vocab_size, (4, 32))  # batch_size=4, block_size=32
             >>> yb = torch.randint(0, vocab_size, (4, 32))
-            >>> logits, loss = model(xb, yb)
+            >>> logits, loss = model.prefill(xb, yb)
             >>> print(logits.shape)  # torch.Size([4, 32, 65])
             >>> print(loss.item())   # scalar loss value
             
-            >>> # Inference mode without loss
-            >>> logits, loss = model(xb)
+            >>> # Evaluation mode without loss (PREFILL)
+            >>> logits, loss = model.prefill(xb)
             >>> print(loss)  # None
         
         Note:
+            - PREFILL PHASE: All T tokens processed in parallel (teacher forcing)
+            - Used in training and evaluation where targets are known
+            - Much faster than decode phase due to parallelization
+            - Computes predictions for all positions simultaneously
             - The method automatically handles token and position embeddings
             - Position embeddings are generated for sequence length T
             - Logits are reshaped for loss computation when targets are provided
             - Uses cross-entropy loss which combines log_softmax and NLL loss
+        
+        See Also:
+            decode(): Sequential token generation for inference (autoregressive)
         """
         B, T = idx.shape
 
@@ -284,13 +296,37 @@ class BigramLanguageModel(nn.Module):
 
         return logits, loss
 
-    def generate(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
+    def forward(self, idx: torch.Tensor, targets: torch.Tensor = None) -> tuple:
         """
-        Generate new tokens autoregressively from the model.
+        Forward pass through the model (delegates to prefill for backward compatibility).
+        
+        This method maintains backward compatibility with existing code that calls
+        model(xb, yb). It simply delegates to the prefill() method.
+        
+        Args:
+            idx: Input token indices
+            targets: Optional target token indices
+            
+        Returns:
+            tuple: (logits, loss) from prefill()
+            
+        Note:
+            For clarity, prefer using prefill() directly for training/evaluation
+            and decode() for autoregressive generation.
+        """
+        return self.prefill(idx, targets)
+
+    def decode(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
+        """
+        DECODE PHASE: Generate new tokens autoregressively (one at a time).
         
         This method performs autoregressive text generation by repeatedly predicting the
-        next token and appending it to the sequence. It uses multinomial sampling from
-        the model's output distribution to generate diverse outputs.
+        next token and appending it to the sequence. Each token is generated sequentially,
+        with each new token depending on all previously generated tokens.
+        
+        The decode phase is inherently sequential and cannot be parallelized like the
+        prefill phase, making it slower but necessary for text generation where future
+        tokens are unknown.
         
         Args:
             idx (torch.Tensor): Initial context tokens of shape (B, T) where:
@@ -306,27 +342,31 @@ class BigramLanguageModel(nn.Module):
                 containing the original context followed by newly generated tokens.
         
         Example:
-            >>> # Generate from empty context
-            >>> model = BigramLanguageModel()
+            >>> # Generate from empty context (DECODE)
+            >>> model = LanguageModel()
             >>> model.load_safetensors('model.safetensors')
             >>> model.eval()
             >>> 
             >>> # Start with newline character (index 0)
             >>> context = torch.zeros((1, 1), dtype=torch.long, device=device)
-            >>> generated = model.generate(context, max_new_tokens=100)
+            >>> generated = model.decode(context, max_new_tokens=100)
             >>> print(generated.shape)  # torch.Size([1, 101])
             >>> 
             >>> # Decode to text
-            >>> from utils import decode
+            >>> from tokenizer import decode
             >>> text = decode(generated[0].tolist())
             >>> print(text)
             
-            >>> # Generate multiple sequences in parallel
+            >>> # Generate multiple sequences in parallel (DECODE)
             >>> context = torch.zeros((4, 1), dtype=torch.long, device=device)
-            >>> generated = model.generate(context, max_new_tokens=50)
+            >>> generated = model.decode(context, max_new_tokens=50)
             >>> print(generated.shape)  # torch.Size([4, 51])
         
         Note:
+            - DECODE PHASE: Tokens generated one at a time (autoregressive)
+            - Used in inference where future tokens are unknown
+            - Much slower than prefill due to sequential dependency
+            - Requires N forward passes for N tokens
             - Generation is performed autoregressively (one token at a time)
             - Uses multinomial sampling for diversity (not greedy decoding)
             - Context is automatically cropped to last block_size tokens if too long
@@ -336,18 +376,22 @@ class BigramLanguageModel(nn.Module):
         
         Implementation Details:
             1. Crop context to last block_size tokens (if needed)
-            2. Get logits from forward pass
-            3. Extract logits for last position
+            2. Get logits from prefill (process current context)
+            3. Extract logits for last position only
             4. Apply softmax to get probabilities
             5. Sample next token from multinomial distribution
             6. Append to sequence and repeat
+        
+        See Also:
+            prefill(): Parallel processing for training/evaluation
+            generate(): Alias for decode() (backward compatibility)
         """
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
             # crop idx to the last block_size tokens
             idx_cond = idx[:, -block_size:]
-            # get the predictions
-            logits, loss = self(idx_cond)
+            # get the predictions using prefill (DECODE calls PREFILL internally)
+            logits, loss = self.prefill(idx_cond)
             # focus only on the last time step
             logits = logits[:, -1, :] # becomes (B, C)
             # apply softmax to get probabilities
@@ -357,6 +401,25 @@ class BigramLanguageModel(nn.Module):
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
+
+    def generate(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
+        """
+        Alias for decode() method (backward compatibility).
+        
+        This method maintains backward compatibility with existing code that calls
+        model.generate(). It simply delegates to the decode() method.
+        
+        Args:
+            idx: Initial context tokens
+            max_new_tokens: Number of tokens to generate
+            
+        Returns:
+            torch.Tensor: Generated sequence from decode()
+            
+        Note:
+            For clarity, prefer using decode() directly for autoregressive generation.
+        """
+        return self.decode(idx, max_new_tokens)
 
     # Added for weight persistence - save model weights to separate files
     def save_weights(self, weights_dir='weights'):
@@ -413,7 +476,7 @@ class BigramLanguageModel(nn.Module):
             path: Path to save the SafeTensors file (default: 'model.safetensors')
         
         Example:
-            >>> model = BigramLanguageModel()
+            >>> model = LanguageModel()
             >>> # After training...
             >>> model.save_safetensors('model.safetensors')
             >>> # Or with custom path
@@ -454,7 +517,7 @@ class BigramLanguageModel(nn.Module):
                 - Parameter shapes don't match expected dimensions
         
         Example:
-            >>> model = BigramLanguageModel()
+            >>> model = LanguageModel()
             >>> # Load from default path
             >>> model.load_safetensors('model.safetensors')
             >>> # Or from custom path
