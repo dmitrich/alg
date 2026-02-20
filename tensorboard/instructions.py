@@ -7,7 +7,6 @@ launching TensorBoard with the correct configuration.
 
 from tensorboard.config import get_runs_directory, get_default_port
 
-
 def print_tensorboard_instructions(log_dir: str) -> None:
     """
     Print instructions for launching TensorBoard manually.

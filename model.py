@@ -42,9 +42,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-# hyperparameters
-batch_size = 4 # how many independent sequences will we process in parallel?
-block_size = 32 # what is the maximum context length for predictions?
+batch_size = 4
+block_size = 32
 max_iters = 1000
 eval_interval = 100
 learning_rate = 1e-3
@@ -54,7 +53,7 @@ n_embd = 64
 n_head = 4
 n_layer = 4
 dropout = 0.0
-vocab_size = 65 # size of the vocabulary (will be set from data)
+vocab_size = 65
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -70,16 +69,14 @@ class Head(nn.Module):
 
     def forward(self, x):
         B,T,C = x.shape
-        k = self.key(x)   # (B,T,C)
-        q = self.query(x) # (B,T,C)
-        # compute attention scores ("affinities")
-        wei = q @ k.transpose(-2,-1) * C**-0.5 # (B, T, C) @ (B, C, T) -> (B, T, T)
-        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
-        wei = F.softmax(wei, dim=-1) # (B, T, T)
+        k = self.key(x)
+        q = self.query(x)
+        wei = q @ k.transpose(-2,-1) * C**-0.5
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
+        wei = F.softmax(wei, dim=-1)
         wei = self.dropout(wei)
-        # perform the weighted aggregation of the values
-        v = self.value(x) # (B,T,C)
-        out = wei @ v # (B, T, T) @ (B, T, C) -> (B, T, C)
+        v = self.value(x)
+        out = wei @ v
         return out
 
 class MultiHeadAttention(nn.Module):
@@ -115,7 +112,6 @@ class Block(nn.Module):
     """ Transformer block: communication followed by computation """
 
     def __init__(self, n_embd, n_head):
-        # n_embd: embedding dimension, n_head: the number of heads we'd like
         super().__init__()
         head_size = n_embd // n_head
         self.sa = MultiHeadAttention(n_head, head_size)
@@ -128,7 +124,6 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-# Transformer language model
 class LanguageModel(nn.Module):
     """
     Character-level transformer language model with multi-head self-attention.
@@ -214,11 +209,10 @@ class LanguageModel(nn.Module):
 
     def __init__(self):
         super().__init__()
-        # each token directly reads off the logits for the next token from a lookup table
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
-        self.ln_f = nn.LayerNorm(n_embd) # final layer norm
+        self.ln_f = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
     def prefill(self, idx: torch.Tensor, targets: torch.Tensor = None) -> tuple:
@@ -278,13 +272,12 @@ class LanguageModel(nn.Module):
         """
         B, T = idx.shape
 
-        # idx and targets are both (B,T) tensor of integers
-        tok_emb = self.token_embedding_table(idx) # (B,T,C)
-        pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T,C)
-        x = tok_emb + pos_emb # (B,T,C)
-        x = self.blocks(x) # (B,T,C)
-        x = self.ln_f(x) # (B,T,C)
-        logits = self.lm_head(x) # (B,T,vocab_size)
+        tok_emb = self.token_embedding_table(idx)
+        pos_emb = self.position_embedding_table(torch.arange(T, device=device))
+        x = tok_emb + pos_emb
+        x = self.blocks(x)
+        x = self.ln_f(x)
+        logits = self.lm_head(x)
 
         if targets is None:
             loss = None
@@ -386,20 +379,13 @@ class LanguageModel(nn.Module):
             prefill(): Parallel processing for training/evaluation
             generate(): Alias for decode() (backward compatibility)
         """
-        # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
-            # crop idx to the last block_size tokens
             idx_cond = idx[:, -block_size:]
-            # get the predictions using prefill (DECODE calls PREFILL internally)
             logits, loss = self.prefill(idx_cond)
-            # focus only on the last time step
-            logits = logits[:, -1, :] # becomes (B, C)
-            # apply softmax to get probabilities
-            probs = F.softmax(logits, dim=-1) # (B, C)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
-            # append sampled index to the running sequence
-            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
+            logits = logits[:, -1, :]
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx, idx_next), dim=1)
         return idx
 
     def generate(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
@@ -421,7 +407,6 @@ class LanguageModel(nn.Module):
         """
         return self.decode(idx, max_new_tokens)
 
-    # Added for weight persistence - save model weights to separate files
     def save_weights(self, weights_dir='weights'):
         """
         Save each model parameter to a separate text file.
@@ -448,18 +433,12 @@ class LanguageModel(nn.Module):
             stacklevel=2
         )
         
-        # Create weights directory if it doesn't exist - added for persistence
         os.makedirs(weights_dir, exist_ok=True)
         
-        # Save each parameter to a separate file - added for persistence
         for name, param in self.named_parameters():
-            # Use parameter name as filename - added for persistence
             filename = os.path.join(weights_dir, f"{name}.txt")
-            # Convert tensor to numpy and save as text - added for persistence
             with open(filename, 'w') as f:
-                # Save tensor shape first for validation - added for persistence
                 f.write(f"# shape: {list(param.shape)}\n")
-                # Save flattened tensor values - added for persistence
                 param_data = param.detach().cpu().numpy().flatten()
                 for val in param_data:
                     f.write(f"{val}\n")
@@ -539,7 +518,6 @@ class LanguageModel(nn.Module):
         import os
         from safetensors.torch import load_file
         
-        # Check if file exists before attempting to load
         if not os.path.exists(path):
             raise FileNotFoundError(
                 f"SafeTensors file not found at '{path}'. "
@@ -547,14 +525,11 @@ class LanguageModel(nn.Module):
             )
         
         try:
-            # Load state dict from SafeTensors file
             state_dict = load_file(path)
             
-            # Load weights into model
             self.load_state_dict(state_dict)
             
         except RuntimeError as e:
-            # Handle incompatible architecture errors
             raise RuntimeError(
                 f"Failed to load weights from '{path}'. The weights are incompatible with the current model architecture. "
                 f"This may occur if the model configuration (n_embd, n_head, n_layer, vocab_size, etc.) "
@@ -562,7 +537,6 @@ class LanguageModel(nn.Module):
                 f"Original error: {str(e)}"
             )
     
-    # Added for weight persistence - load model weights from separate files
     def load_weights(self, weights_dir='weights'):
         """
         Load model parameters from separate text files.
@@ -595,19 +569,15 @@ class LanguageModel(nn.Module):
             stacklevel=2
         )
         
-        # Check if weights directory exists - added for error handling
         if not os.path.exists(weights_dir):
             raise FileNotFoundError(
                 f"Weights directory not found at '{weights_dir}'. "
                 f"Please train a model first using train.py or verify the weights directory path."
             )
         
-        # Load each parameter from its file - added for persistence
         for name, param in self.named_parameters():
-            # Construct filename from parameter name - added for persistence
             filename = os.path.join(weights_dir, f"{name}.txt")
             
-            # Check if weight file exists - added for error handling
             if not os.path.exists(filename):
                 raise FileNotFoundError(
                     f"Weight file not found: '{filename}'. "
@@ -615,17 +585,13 @@ class LanguageModel(nn.Module):
                     f"Please ensure all weight files are present or retrain the model."
                 )
             
-            # Try-except block for weight loading failures - added for error handling
             try:
-                # Load weight values from file - added for persistence
                 with open(filename, 'r') as f:
                     lines = f.readlines()
                     
-                    # Validate file is not empty - added for error handling
                     if not lines:
                         raise ValueError(f"Weight file '{filename}' is empty.")
                     
-                    # Parse shape from first line - added for persistence
                     shape_line = lines[0].strip()
                     if not shape_line.startswith("# shape:"):
                         raise ValueError(
@@ -633,7 +599,6 @@ class LanguageModel(nn.Module):
                             f"missing shape information. Expected first line to start with '# shape:'."
                         )
                     
-                    # Extract shape - added for persistence
                     shape_str = shape_line.replace("# shape:", "").strip()
                     try:
                         expected_shape = eval(shape_str)
@@ -643,7 +608,6 @@ class LanguageModel(nn.Module):
                             f"Error: {str(e)}"
                         )
                     
-                    # Validate shape matches parameter - added for error handling
                     if list(param.shape) != expected_shape:
                         raise ValueError(
                             f"Weight file '{filename}' has incompatible shape. "
@@ -652,11 +616,10 @@ class LanguageModel(nn.Module):
                             f"Please retrain the model or use compatible weight files."
                         )
                     
-                    # Load weight values - added for persistence
                     values = []
                     for line_num, line in enumerate(lines[1:], start=2):
                         line = line.strip()
-                        if line:  # Skip empty lines - added for persistence
+                        if line:
                             try:
                                 values.append(float(line))
                             except ValueError as e:
@@ -665,7 +628,6 @@ class LanguageModel(nn.Module):
                                     f"Expected a numeric value. Error: {str(e)}"
                                 )
                     
-                    # Validate correct number of values - added for error handling
                     expected_count = np.prod(expected_shape)
                     if len(values) != expected_count:
                         raise ValueError(
@@ -674,7 +636,6 @@ class LanguageModel(nn.Module):
                             f"but found {len(values)} values. The file may be corrupted or incomplete."
                         )
                     
-                    # Convert to numpy array and reshape - added for persistence
                     try:
                         weight_array = np.array(values, dtype=np.float32).reshape(expected_shape)
                     except Exception as e:
@@ -683,20 +644,16 @@ class LanguageModel(nn.Module):
                             f"Shape: {expected_shape}, Values: {len(values)}. Error: {str(e)}"
                         )
                     
-                    # Load into parameter - added for persistence
                     param.data = torch.from_numpy(weight_array).to(param.device)
                     
             except IOError as e:
-                # Handle file I/O errors - added for error handling
                 raise IOError(
                     f"Failed to read weight file '{filename}'. "
                     f"Please check file permissions and disk space. Error: {str(e)}"
                 )
             except (ValueError, FileNotFoundError) as e:
-                # Re-raise validation errors with context - added for error handling
                 raise
             except Exception as e:
-                # Catch any unexpected errors - added for error handling
                 raise RuntimeError(
                     f"Unexpected error while loading weights from '{filename}': {str(e)}. "
                     f"The weight file may be corrupted. Please retrain the model."

@@ -10,7 +10,6 @@ from dataclasses import dataclass
 import json
 import torch
 
-
 @dataclass
 class ModelConfig:
     """
@@ -57,7 +56,6 @@ class ModelConfig:
         ... )
     """
     
-    # Training parameters
     batch_size: int
     block_size: int
     max_iters: int
@@ -65,14 +63,12 @@ class ModelConfig:
     learning_rate: float
     eval_iters: int
     
-    # Model architecture parameters
     n_embd: int
     n_head: int
     n_layer: int
     dropout: float
     vocab_size: int
     
-    # Device configuration with default based on MPS/CUDA/CPU availability
     device: str = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     
     def validate(self) -> None:
@@ -106,7 +102,6 @@ class ModelConfig:
             >>> config.validate()  # Raises ValueError
             ValueError: batch_size must be greater than 0, got -1
         """
-        # Validate training parameters
         if self.batch_size <= 0:
             raise ValueError(f"batch_size must be greater than 0, got {self.batch_size}")
         
@@ -125,7 +120,6 @@ class ModelConfig:
         if self.eval_iters <= 0:
             raise ValueError(f"eval_iters must be greater than 0, got {self.eval_iters}")
         
-        # Validate model architecture parameters
         if self.n_embd <= 0:
             raise ValueError(f"n_embd must be greater than 0, got {self.n_embd}")
         
@@ -135,11 +129,9 @@ class ModelConfig:
         if self.n_layer <= 0:
             raise ValueError(f"n_layer must be greater than 0, got {self.n_layer}")
         
-        # Validate dropout is in valid range [0, 1)
         if self.dropout < 0 or self.dropout >= 1:
             raise ValueError(f"dropout must be in range [0, 1), got {self.dropout}")
         
-        # Validate n_embd is divisible by n_head (required for multi-head attention)
         if self.n_embd % self.n_head != 0:
             raise ValueError(
                 f"n_embd must be divisible by n_head for multi-head attention. "
@@ -199,7 +191,6 @@ class ModelConfig:
             The 'device' field defaults to 'cuda' if available, otherwise 'cpu'.
             The 'vocab_size' can be provided either in the JSON file or as a parameter.
         """
-        # Handle FileNotFoundError with clear error message
         try:
             with open(config_path, 'r') as f:
                 config_dict = json.load(f)
@@ -212,17 +203,13 @@ class ModelConfig:
                 e.pos
             )
         
-        # If vocab_size is provided as parameter, use it (override JSON if present)
         if vocab_size is not None:
             config_dict['vocab_size'] = vocab_size
         
-        # Create ModelConfig instance from parsed JSON
         config = cls(**config_dict)
         
-        # Call validate() after loading
         config.validate()
         
-        # Return ModelConfig instance
         return config
     
     @classmethod
@@ -265,10 +252,8 @@ class ModelConfig:
             This method does not call validate() automatically. The caller should
             call validate() on the returned instance if validation is needed.
         """
-        # Merge config dict with vocab_size
         merged_dict = {**config_dict, 'vocab_size': vocab_size}
         
-        # Create ModelConfig instance
         return cls(**merged_dict)
     
     def to_dict(self) -> dict:
@@ -303,7 +288,6 @@ class ModelConfig:
             >>> print(config_dict['vocab_size'])
             65
         """
-        # Convert dataclass to dictionary using dataclasses.asdict()
         from dataclasses import asdict
         return asdict(self)
     
@@ -351,7 +335,6 @@ class ModelConfig:
             - dropout: Dropout probability
             - vocab_size: Size of the vocabulary
         """
-        # Set all global variables in model module from config
         model_module.batch_size = self.batch_size
         model_module.block_size = self.block_size
         model_module.max_iters = self.max_iters

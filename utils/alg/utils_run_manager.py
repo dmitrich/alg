@@ -11,7 +11,6 @@ from pathlib import Path
 import shutil
 import torch
 
-
 class RunIDGenerator:
     """Generates unique run identifiers."""
     
@@ -48,11 +47,9 @@ class RunIDGenerator:
         if not os.path.exists(runs_dir):
             return 1
         
-        # Find all run directories for this date
         existing_runs = []
         for entry in os.listdir(runs_dir):
             if entry.startswith(date):
-                # Extract counter from run ID (format: YYYY-MM-DD_NNN or YYYY-MM-DD_NNN_tag)
                 parts = entry.split('_')
                 if len(parts) >= 2:
                     try:
@@ -65,7 +62,6 @@ class RunIDGenerator:
             return 1
         
         return max(existing_runs) + 1
-
 
 class RunDirectoryCreator:
     """Creates run directory structure."""
@@ -100,7 +96,6 @@ class RunDirectoryCreator:
         
         for subdir in subdirs:
             os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)
-
 
 class MetadataCapture:
     """Captures git and environment metadata."""
@@ -158,7 +153,7 @@ class MetadataCapture:
         Returns:
             Python version string
         """
-        return sys.version.split()[0]  # Get just the version number (e.g., "3.11.5")
+        return sys.version.split()[0]
     
     def capture_git_info(self, output_path: str) -> None:
         """
@@ -168,7 +163,6 @@ class MetadataCapture:
             output_path: Path to write git.txt
         """
         try:
-            # Get commit hash
             result = subprocess.run(
                 ['git', 'rev-parse', 'HEAD'],
                 capture_output=True,
@@ -183,7 +177,6 @@ class MetadataCapture:
             
             commit_hash = result.stdout.strip()
             
-            # Check if dirty
             result = subprocess.run(
                 ['git', 'diff-index', '--quiet', 'HEAD'],
                 capture_output=True,
@@ -192,7 +185,6 @@ class MetadataCapture:
             
             is_dirty = result.returncode != 0
             
-            # Write git info
             with open(output_path, 'w') as f:
                 f.write(f"commit: {commit_hash}\n")
                 if is_dirty:
@@ -234,7 +226,6 @@ class MetadataCapture:
             if os.path.exists(src):
                 shutil.copy2(src, dst)
         
-        # Create empty notes.md file
         notes_path = os.path.join(meta_dir, 'notes.md')
         with open(notes_path, 'w') as f:
             f.write("# Run Notes\n\n")

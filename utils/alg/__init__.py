@@ -3,7 +3,6 @@ ALG Utils package for ALG training project.
 Contains utility modules for configuration, run management, and output formatting.
 """
 
-# Import from renamed modules for backward compatibility
 from utils.alg.utils_config_loader import ConfigLoader, ConfigMigrator
 from utils.alg.utils_run_manager import RunIDGenerator, RunDirectoryCreator, MetadataCapture
 from utils.alg.utils_output import (

@@ -5,7 +5,6 @@ This module provides functionality to print instructions for manually
 launching the Aim UI to view and compare experiment runs.
 """
 
-
 def print_aim_instructions(repo_path: str = '.aim') -> None:
     """
     Print instructions for launching Aim UI manually.

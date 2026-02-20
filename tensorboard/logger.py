@@ -8,7 +8,6 @@ error handling.
 
 from tensorboard.writer import TensorBoardWriter
 
-
 class MetricLogger:
     """Logs training metrics to TensorBoard."""
     
@@ -83,13 +82,11 @@ class MetricLogger:
             try:
                 for name, param in model.named_parameters():
                     if param.requires_grad:
-                        # Log parameter values
                         self.writer.writer.add_histogram(
                             f'Parameters/{name}', 
                             param.data.cpu(), 
                             step
                         )
-                        # Log gradients if they exist
                         if param.grad is not None:
                             self.writer.writer.add_histogram(
                                 f'Gradients/{name}', 

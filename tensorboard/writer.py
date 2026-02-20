@@ -9,7 +9,6 @@ output messages.
 import os
 import shutil
 
-
 class TensorBoardWriter:
     """Manages TensorBoard SummaryWriter lifecycle with dual-location logging."""
     
@@ -43,13 +42,10 @@ class TensorBoardWriter:
         if self.available and self.writer is not None:
             self.writer.close()
             
-            # Copy logs to secondary location if specified
             if self.secondary_log_dir:
                 try:
-                    # Ensure secondary directory exists
                     os.makedirs(self.secondary_log_dir, exist_ok=True)
                     
-                    # Copy all event files from primary to secondary location
                     for filename in os.listdir(self.log_dir):
                         if filename.startswith('events.out.tfevents'):
                             src = os.path.join(self.log_dir, filename)

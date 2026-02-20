@@ -13,7 +13,6 @@ import urllib.request
 import urllib.error
 from tensorboard.config import get_runs_directory, get_default_port, get_max_port_attempts
 
-
 def is_port_in_use(port: int) -> bool:
     """
     Check if a port is already in use.
@@ -31,7 +30,6 @@ def is_port_in_use(port: int) -> bool:
         except OSError:
             return True
 
-
 def is_tensorboard_running(port: int) -> bool:
     """
     Check if TensorBoard is actually running on the specified port.
@@ -43,12 +41,10 @@ def is_tensorboard_running(port: int) -> bool:
         True if TensorBoard is responding on the port, False otherwise
     """
     try:
-        # Try to connect to the TensorBoard web interface
         with urllib.request.urlopen(f'http://localhost:{port}/', timeout=1) as response:
             return response.status == 200
     except (urllib.error.URLError, ConnectionRefusedError, TimeoutError):
         return False
-
 
 def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts: int = None) -> None:
     """
@@ -72,7 +68,6 @@ def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts
         - If all ports fail, prints manual launch command as fallback
         - Handles import errors gracefully (TensorBoard not installed)
     """
-    # Load configuration
     if start_port is None:
         start_port = get_default_port()
     if max_attempts is None:
@@ -80,7 +75,6 @@ def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts
     
     runs_dir = get_runs_directory()
     
-    # Check if tensorboard is available
     try:
         import tensorboard
     except ImportError:
@@ -89,7 +83,6 @@ def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts
         print(f"Then run: tensorboard --logdir={log_dir}")
         return
     
-    # Check if TensorBoard is already running on the default port
     if is_tensorboard_running(start_port):
         print(f"\n✓ TensorBoard is already running at http://localhost:{start_port}/")
         print(f"  Your new run logs are at: {log_dir}")
@@ -99,19 +92,15 @@ def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts
     
     print("\nLaunching TensorBoard server...")
     
-    # Try to find an available port
     port = start_port
     for attempt in range(max_attempts):
         if not is_port_in_use(port):
-            # Port is available, try to launch TensorBoard
             try:
-                # Launch TensorBoard as a background process
-                # Use DEVNULL to suppress output and detach from parent process
                 subprocess.Popen(
                     [sys.executable, '-m', 'tensorboard.main', '--logdir', log_dir, '--port', str(port), '--host', 'localhost'],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    start_new_session=True  # Detach from parent process
+                    start_new_session=True
                 )
                 
                 print(f"✓ TensorBoard launched successfully!")
@@ -122,18 +111,15 @@ def launch_tensorboard_server(log_dir: str, start_port: int = None, max_attempts
                 
             except Exception as e:
                 print(f"Failed to launch TensorBoard on port {port}: {e}")
-                # Try next port
                 port += 1
                 continue
         else:
-            # Port in use, try next one
             if attempt == 0:
                 print(f"Port {port} in use, trying {port + 1}...")
             else:
                 print(f"Port {port} in use, trying {port + 1}...")
             port += 1
     
-    # All attempts failed, provide manual command
     print(f"\nCould not launch TensorBoard automatically (ports {start_port}-{port-1} unavailable).")
     print(f"To view logs manually, run:")
     print(f"  tensorboard --logdir={log_dir}")

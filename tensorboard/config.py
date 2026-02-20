@@ -8,7 +8,6 @@ the configuration file.
 import json
 import os
 
-
 def load_tensorboard_config(config_path: str = "configs/tensorboard.json") -> dict:
     """
     Load TensorBoard configuration from JSON file.
@@ -38,7 +37,6 @@ def load_tensorboard_config(config_path: str = "configs/tensorboard.json") -> di
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 config = json.load(f)
-                # Merge with defaults to ensure all keys exist
                 return {**default_config, **config}
         else:
             print(f"TensorBoard config not found at {config_path}, using defaults")
@@ -47,7 +45,6 @@ def load_tensorboard_config(config_path: str = "configs/tensorboard.json") -> di
         print(f"Warning: Failed to load TensorBoard config: {e}")
         print("Using default configuration")
         return default_config
-
 
 def get_runs_directory() -> str:
     """
@@ -59,7 +56,6 @@ def get_runs_directory() -> str:
     config = load_tensorboard_config()
     return config.get("runs_directory", "runs")
 
-
 def get_default_port() -> int:
     """
     Get the configured default TensorBoard port.
@@ -70,7 +66,6 @@ def get_default_port() -> int:
     config = load_tensorboard_config()
     return config.get("default_port", 6006)
 
-
 def get_max_port_attempts() -> int:
     """
     Get the configured maximum port retry attempts.
@@ -80,7 +75,6 @@ def get_max_port_attempts() -> int:
     """
     config = load_tensorboard_config()
     return config.get("max_port_attempts", 10)
-
 
 def get_histogram_interval() -> int:
     """

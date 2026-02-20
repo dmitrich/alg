@@ -10,7 +10,6 @@ import torch
 from typing import Tuple
 from tokenizer import create_tokenizer
 
-
 def load_data(data_path: str = 'data/input.txt') -> Tuple[torch.Tensor, torch.Tensor, str]:
     """
     Load and split training data.
@@ -48,40 +47,30 @@ def load_data(data_path: str = 'data/input.txt') -> Tuple[torch.Tensor, torch.Te
         - The same data file must be used for both training and inference to ensure
           consistent vocabulary
     """
-    # Added file path handling for modular data loading
-    # Added error handling for missing or unreadable data file
     try:
-        # read it in to inspect it
         with open(data_path, 'r', encoding='utf-8') as f:
             text = f.read()
     except FileNotFoundError:
-        # Added descriptive error message for missing data file
         raise FileNotFoundError(
             f"Training data not found at '{data_path}'. "
             f"Please ensure the data file exists at the specified path. "
             f"For training, place the Shakespeare dataset at 'data/input.txt'."
         )
     except IOError as e:
-        # Added descriptive error message for file read errors
         raise IOError(
             f"Failed to read training data from '{data_path}': {str(e)}. "
             f"Please check file permissions and ensure the file is readable."
         )
     
-    # Create tokenizer and encode the text
     encode, decode, vocab_size = create_tokenizer(text)
     
-    # let's now encode the entire text dataset and store it into a torch.Tensor
     data = torch.tensor(encode(text), dtype=torch.long)
     
-    # Let's now split up the data into train and validation sets
-    n = int(0.9*len(data)) # first 90% will be train, rest val
+    n = int(0.9*len(data))
     train_data = data[:n]
     val_data = data[n:]
     
-    # Added return statement to provide data to training module
     return train_data, val_data, text
-
 
 def get_batch(
     split: str,
@@ -131,11 +120,9 @@ def get_batch(
         - This implements the standard language modeling objective: predict the next token
         - Tensors are automatically moved to the specified device (GPU/CPU)
     """
-    # generate a small batch of data of inputs x and targets y
     data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([data[i:i+block_size] for i in ix])
     y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    # Added device parameter for GPU/CPU compatibility
     x, y = x.to(device), y.to(device)
     return x, y

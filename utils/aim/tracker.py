@@ -9,7 +9,6 @@ comprehensive error handling to ensure training continues even if Aim fails.
 from typing import Dict, Any, Optional
 import numpy as np
 
-
 class AimTracker:
     """
     Wrapper for Aim experiment tracking that integrates with existing training pipeline.
@@ -33,12 +32,11 @@ class AimTracker:
             from aim import Run
             
             self.run = Run(
-                run_hash=None,  # Let Aim generate unique hash
+                run_hash=None,
                 repo=repo_path,
-                experiment=run_name  # Use run_name as experiment name
+                experiment=run_name
             )
             
-            # Store run directory path in Aim Run metadata
             self.run['run_dir'] = run_dir
             self.run['run_name'] = run_name
             self.enabled = True
@@ -60,10 +58,8 @@ class AimTracker:
             return
         
         try:
-            # Store entire config dict in Aim Run
             self.run['hparams'] = config
             
-            # Also store individual params for easier filtering in UI
             for key, value in config.items():
                 self.run[key] = value
                 

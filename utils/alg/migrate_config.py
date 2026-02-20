@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Configuration migration script for ALG1 training project.
 Migrates legacy config.json to new split configuration structure.
@@ -11,7 +10,6 @@ Usage:
 
 import argparse
 from utils.alg.utils_config_loader import ConfigMigrator
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -41,7 +39,6 @@ def main():
     print(f"  - {args.target}/train.yaml")
     print(f"  - {args.target}/data.yaml")
     print(f"\nYou can now use 'python train.py' to train with the new configuration structure.")
-
 
 if __name__ == '__main__':
     main()
